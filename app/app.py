@@ -1,7 +1,7 @@
 import streamlit as st
 import tensorflow as tf
 import numpy as np
-import cv2
+from PIL import Image
 import os
 
 # Load model
@@ -15,25 +15,26 @@ st.write("Upload a brain MRI image to detect tumor presence.")
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Read image as OpenCV format
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    image = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+    # Read and display image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded MRI", use_container_width=True)
 
-    if image is not None:
-        st.image(image, caption="Uploaded MRI", use_column_width=True)
+    # Convert to RGB if needed
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
 
-        # Preprocess image
-        resized = cv2.resize(image, (150, 150)).reshape(1, 150, 150, 1) / 255.0
+    # Resize and preprocess
+    image_resized = image.resize((150, 150))
+    img_array = np.array(image_resized) / 255.0  # Normalize
+    img_array = np.expand_dims(img_array, axis=0)  # (1, 150, 150, 3)
 
-        # Predict
-        prediction = model.predict(resized)[0][0]
-        label = "Tumor Detected" if prediction > 0.5 else "No Tumor Detected"
+    # Predict
+    prediction = model.predict(img_array)[0][0]
+    label = "Tumor Detected" if prediction > 0.5 else "No Tumor Detected"
 
-        st.markdown("---")
-        st.subheader("🔎 Result:")
-        if prediction > 0.5:
-            st.error(f"⚠️ {label} (Confidence: {prediction:.2f})")
-        else:
-            st.success(f"✅ {label} (Confidence: {1 - prediction:.2f})")
+    st.markdown("---")
+    st.subheader("🔎 Result:")
+    if prediction > 0.5:
+        st.error(f"⚠️ {label} (Confidence: {prediction:.2f})")
     else:
-        st.warning("⚠️ Could not read the image.")
+        st.success(f"✅ {label} (Confidence: {1 - prediction:.2f})")
